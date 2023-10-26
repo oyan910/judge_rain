@@ -7,13 +7,17 @@ from PyQt5.QtGui import QImage, QPixmap, QImageReader
 
 
 class Window(QWidget):
+    """窗口类
+
+
+    """
     def __init__(self):
         super().__init__()
         uic.loadUi('window.ui', self)
         self.playing = False    # 播放状态
-        self.Time = QTimer(self)
-        self.Time.timeout.connect(self.update_frame)
-        self.Time.start(1)
+        # self.Time = QTimer(self)
+        # self.Time.timeout.connect(self.update_frame)
+        # self.Time.start(1)
         self.cap = cv2.VideoCapture(0)
         self.Input = self.Win1      # 输入摄像头/原始视频展示帧
         self.Output = self.Win2     # 输出画面
@@ -22,21 +26,22 @@ class Window(QWidget):
         self.Addfile = self.add_to_file  # 加入视频文件
         self.State = self.state          # 状态显示
         self.Start = self.btn_start  # 开始播放(视频)
+        self.CameraList = self.CameraBox # 摄像头列表
         self.State.setText("未开启")
-        self.to_connect()
-    def to_connect(self):
-        self.Camera.clicked.connect(self.res_btn_camera)
-    def res_btn_camera(self):
-        if self.playing:
-            self.Time.stop()
-            self.Camera.setText("开启摄像头")
-
-            self.State.setText("未开启")
-        else:
-            self.Time.start(1)
-            self.Camera.setText("关闭摄像头")
-            self.State.setText("<font color = 'red'>摄像头开启</font>")
-        self.playing = not self.playing
+        # self.to_connect()
+    # def to_connect(self):
+    #     self.Camera.clicked.connect(self.res_btn_camera)
+    # def res_btn_camera(self):
+    #     if self.playing:
+    #         self.Time.stop()
+    #         self.Camera.setText("开启摄像头")
+    #
+    #         self.State.setText("未开启")
+    #     else:
+    #         self.Time.start(1)
+    #         self.Camera.setText("关闭摄像头")
+    #         self.State.setText("<font color = 'red'>摄像头开启</font>")
+    #     self.playing = not self.playing
     def update_frame(self):
         ret, frame = self.cap.read()
         if self.playing:
@@ -54,8 +59,3 @@ class Window(QWidget):
                 self.Input.setPixmap(pixmap)
 
 
-if __name__ == '__main__':
-    app = QApplication([])
-    win = Window()
-    win.show()
-    app.exec_()
