@@ -1,13 +1,15 @@
 from Window import Window
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QFileDialog, QListWidget
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap, QImageReader
 import cv2
+from PyQt5 import QtCore
+_translate = QtCore.QCoreApplication.translate  # 翻译函数
 class Controller:
     def __init__(self):
 
         self.View = Window()
-        self.playing = False            # 是否开始输入标识
+        self.playing = 0            # 是否开始输入标识
         self.selected_camera = None     # 摄像头
 
         self.Time = QTimer()
@@ -17,6 +19,7 @@ class Controller:
         self.btn_to_connect()
         self.get_camera_list()
         self.Cameralist.currentIndexChanged.connect(self.change_camera)
+
 
         pass
 
@@ -41,7 +44,7 @@ class Controller:
     def change_camera(self, index):
         if index > 0:
             self.selected_camera = cv2.VideoCapture(index - 1)
-            self.Time.start(10)  # 50ms 更新一次摄像头画面
+            # self.Time.start(10)  # 50ms 更新一次摄像头画面
         else:
             self.selected_camera = None
             self.Time.stop()
@@ -50,20 +53,21 @@ class Controller:
     def btn_to_connect(self):
         # 一些按钮功能连接
         self.View.Camera.clicked.connect(self.btn_change_open)
+        self.Addfile.clicked.connect(self.open_video)
         pass
 
     def btn_change_open(self):
         # 点击后打开摄像头
-        if self.playing:
+        if self.playing == 1:
             self.Time.stop()
             self.View.Camera.setText("开启摄像头")
-
+            self.playing = 0
             self.State.setText("未开启")
         else:
             self.Time.start(1)
             self.View.Camera.setText("关闭摄像头")
             self.State.setText("<font color = 'red'>摄像头开启</font>")
-        self.playing = not self.playing
+            self.playing = 1
         pass
 
 
@@ -85,17 +89,38 @@ class Controller:
 
     def update_input(self):
         # 更新输入摄像头用的
-        if self.playing:
-            if self.selected_camera and self.selected_camera.isOpened():
+        if self.selected_camera and self.selected_camera.isOpened():
+            if self.playing != 0:
                 ret, frame = self.selected_camera.read()
                 if ret:
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     image = QPixmap.fromImage(QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format_RGB888))
                     self.Input.setPixmap(image)
-        pass
+
+
+
+    pass
 
     def win_to_show(self):
         self.View.show()
+
+    def open_video(self):
+        # 打开文件目录选择视频文件
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
+
+        video_file, _ = QFileDialog.getOpenFileName(self.View, "选择视频文件", "", "Video Files (*.avi *.mp4 *.mov *.mkv)", options=options)
+
+        if video_file:
+            try:
+                print(type(video_file))
+            #     # 添加选定的视频文件路径到播放列表
+
+                self.playing = 2
+                self.selected_camera = cv2.VideoCapture(video_file)
+                self.Time.start(20)
+            except Exception as e:
+                print(f"Error opening video: {e}")
 
 if __name__ == '__main__':
     app = QApplication([])

@@ -1,60 +1,61 @@
-import cv2
 import sys
-from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget, QComboBox
-from PyQt5.QtGui import QPixmap, QImage
-from PyQt5.QtCore import QTimer
+import cv2
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QListWidget, QFileDialog, QWidget
+from PyQt5.QtCore import Qt
 
-class CameraViewer(QWidget):
+class VideoPlayer(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("摄像头查看器")
-        self.layout = QVBoxLayout()
 
-        self.camera_combo = QComboBox()
-        self.camera_combo.addItem("选择摄像头")
-        self.layout.addWidget(self.camera_combo)
+        self.setWindowTitle("视频播放器")
+        self.setGeometry(100, 100, 800, 600)
 
-        self.display_label = QLabel()
-        self.layout.addWidget(self.display_label)
+        self.play_button = QPushButton("选择并播放视频")
+        self.play_button.clicked.connect(self.open_video)
 
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.show_camera)
-        self.selected_camera = None
+        self.video_list = QListWidget()
+        self.video_list.setFlow(QListWidget.TopToBottom)
 
-        # 使用 OpenCV 获取可用摄像头列表
-        self.camera_list = [f'摄像头 {i}' for i in range(10) if cv2.VideoCapture(i).isOpened()]
+        layout = QVBoxLayout()
+        layout.addWidget(self.play_button)
+        layout.addWidget(self.video_list)
 
-        if self.camera_list:
-            self.camera_combo.addItems(self.camera_list)
+        container = QWidget()
+        container.setLayout(layout)
 
-        self.camera_combo.currentIndexChanged.connect(self.change_camera)
+        self.setCentralWidget(container)
 
-        self.setLayout(self.layout)
+        self.video_capture = None
 
+    def open_video(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
 
-    def change_camera(self, index):
-        if index > 0:
-            self.selected_camera = cv2.VideoCapture(index - 1)
-            self.timer.start(10)  # 50ms 更新一次摄像头画面
-        else:
-            self.selected_camera = None
-            self.timer.stop()
-            self.display_label.clear()
+        video_file, _ = QFileDialog.getOpenFileName(self, "选择视频文件", "", "Video Files (*.avi *.mp4 *.mov *.mkv)", options=options)
 
-    def show_camera(self):
-        if self.selected_camera and self.selected_camera.isOpened():
-            ret, frame = self.selected_camera.read()
-            if ret:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                image = QPixmap.fromImage(QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format_RGB888))
-                self.display_label.setPixmap(image)
+        if video_file:
+            # 添加选定的视频文件路径到播放列表
+            self.video_list.addItem(video_file)
 
-def main():
-    app = QApplication(sys.argv)
-    viewer = CameraViewer()
-    viewer.show()
-    sys.exit(app.exec_())
+    def play_video(self, video_path):
+        if self.video_capture is not None:
+            self.video_capture.release()
+        self.video_capture = cv2.VideoCapture(video_path)
 
+        while self.video_capture.isOpened():
+            ret, frame = self.video_capture.read()
+            if not ret:
+                break
+
+            # 在这里将帧(frame)显示在你的播放区域，这部分需要根据你的界面布局来实现
+
+            # 更新界面以显示下一帧
+            QApplication.processEvents()
+            # 添加适当的等待时间，以控制视频的帧率
+            cv2.waitKey(30)
 
 if __name__ == '__main__':
-    main()
+    app = QApplication(sys.argv)
+    window = VideoPlayer()
+    window.show()
+    sys.exit(app.exec_())
