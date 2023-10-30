@@ -1,61 +1,84 @@
-import sys
 import cv2
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QListWidget, QFileDialog, QWidget
-from PyQt5.QtCore import Qt
+import numpy as np
 
-class VideoPlayer(QMainWindow):
-    def __init__(self):
-        super().__init__()
 
-        self.setWindowTitle("视频播放器")
-        self.setGeometry(100, 100, 800, 600)
+def zmMinFilterGray(src, r=7):
+    '''最小值滤波，r是滤波器半径'''
+    '''if r <= 0:
+        return src
+    h, w = src.shape[:2]
+     I= src
+    res = np.minimum(I  ,I[[0]+range(h-1)  , :])
+    res = np.minimum(res, I[range(1,h)+[h-1], :])
+     I= res
+    res = np.minimum(I  , I[:,[0]+range(w-1)])
+    res = np.minimum(res, I[:, range(1,w)+[w-1]])
+    return zmMinFilterGray(res, r-1)'''
+    return cv2.erode(src, np.ones((2 * r + 1, 2 * r + 1)))  # 使用opencv的erode函数更高效
 
-        self.play_button = QPushButton("选择并播放视频")
-        self.play_button.clicked.connect(self.open_video)
 
-        self.video_list = QListWidget()
-        self.video_list.setFlow(QListWidget.TopToBottom)
+def guidedfilter(I, p, r, eps):
+    '''引导滤波'''
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.play_button)
-        layout.addWidget(self.video_list)
+    height, width = I.shape
+    m_I = cv2.boxFilter(I, -1, (r, r))
+    m_p = cv2.boxFilter(p, -1, (r, r))
+    m_Ip = cv2.boxFilter(I * p, -1, (r, r))
+    cov_Ip = m_Ip - m_I * m_p
+    m_II = cv2.boxFilter(I * I, -1, (r, r))
+    var_I = m_II - m_I * m_I
+    a = cov_Ip / (var_I + eps)
+    b = m_p - a * m_I
+    m_a = cv2.boxFilter(a, -1, (r, r))
+    m_b = cv2.boxFilter(b, -1, (r, r))
+    return m_a * I + m_b
 
-        container = QWidget()
-        container.setLayout(layout)
 
-        self.setCentralWidget(container)
+def getV1(m, r, eps, w, maxV1):  # 输入rgb图像，值范围[0,1]
+    '''计算大气遮罩图像V1和光照值A, V1 = 1-t/A'''
+    V1 = np.min(m, 2)  # 得到暗通道图像
 
-        self.video_capture = None
 
-    def open_video(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.ReadOnly
+    V1 = guidedfilter(V1, zmMinFilterGray(V1, 7), r, eps)  # 使用引导滤波优化
+    bins = 2000
+    ht = np.histogram(V1, bins)  # 计算大气光照A
+    d = np.cumsum(ht[0]) / float(V1.size)
+    for lmax in range(bins - 1, 0, -1):
+        if d[lmax] <= 0.999:
+            break
+    A = np.mean(m, 2)[V1 >= ht[1][lmax]].max()
+    V1 = np.minimum(V1 * w, maxV1)  # 对值范围进行限制
+    return V1, A
 
-        video_file, _ = QFileDialog.getOpenFileName(self, "选择视频文件", "", "Video Files (*.avi *.mp4 *.mov *.mkv)", options=options)
 
-        if video_file:
-            # 添加选定的视频文件路径到播放列表
-            self.video_list.addItem(video_file)
+def deHaze(m, r=81, eps=0.001, w=0.95, maxV1=0.80, bGamma=False):
+    Y = np.zeros(m.shape)
 
-    def play_video(self, video_path):
-        if self.video_capture is not None:
-            self.video_capture.release()
-        self.video_capture = cv2.VideoCapture(video_path)
 
-        while self.video_capture.isOpened():
-            ret, frame = self.video_capture.read()
-            if not ret:
-                break
+    V1, A = getV1(m, r, eps, w, maxV1)  # 得到遮罩图像和大气光照
+    for k in range(3):
+        Y[:, :, k] = (m[:, :, k] - V1) / (1 - V1 / A)  # 颜色校正
+    Y = np.clip(Y, 0, 1)
+    if bGamma:
+        Y = Y ** (np.log(0.5) / np.log(Y.mean()))  # gamma校正,默认不进行该操作
+    return Y
 
-            # 在这里将帧(frame)显示在你的播放区域，这部分需要根据你的界面布局来实现
-
-            # 更新界面以显示下一帧
-            QApplication.processEvents()
-            # 添加适当的等待时间，以控制视频的帧率
-            cv2.waitKey(30)
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    window = VideoPlayer()
-    window.show()
-    sys.exit(app.exec_())
+video = "1.mp4"
+cap = cv2.VideoCapture(video)
+while cap.isOpened():
+    _, frame = cap.read()
+    frame = cv2.flip(frame, -180)
+    cv2.imwrite("temp.jpg", frame)
+    m = deHaze(frame / 255.0) * 255
+    height, width = m.shape[:2]
+    # 缩小图像
+    size = (int(width * 0.5), int(height * 0.5))
+    shrink = cv2.resize(m, size, interpolation=cv2.INTER_AREA)
+    cv2.imwrite('defog.jpg', shrink)
+    img = cv2.imread("defog.jpg")
+    cv2.imshow("frame", img)
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord("q"):
+        break
+cap.release()
+cv2.destroyAllWindows()

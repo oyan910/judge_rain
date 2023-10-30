@@ -1,15 +1,18 @@
 from Window import Window
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QFileDialog, QListWidget
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QImage, QPixmap, QImageReader
+from PyQt5.QtWidgets import QApplication, QFileDialog
+from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QImage, QPixmap
 import cv2
 from PyQt5 import QtCore
+from Judge import Judge
 _translate = QtCore.QCoreApplication.translate  # 翻译函数
 class Controller:
     def __init__(self):
 
         self.View = Window()
+        self.J = Judge()
         self.playing = 0            # 是否开始输入标识
+        self.judging = 0
         self.selected_camera = None     # 摄像头
 
         self.Time = QTimer()
@@ -41,6 +44,7 @@ class Controller:
         self.Start = self.View.Start
         self.Cameralist = self.View.CameraList
 
+
     def change_camera(self, index):
         if index > 0:
             self.selected_camera = cv2.VideoCapture(index - 1)
@@ -54,6 +58,7 @@ class Controller:
         # 一些按钮功能连接
         self.View.Camera.clicked.connect(self.btn_change_open)
         self.Addfile.clicked.connect(self.open_video)
+        self.Judge.clicked.connect(self.to_judge)
         pass
 
     def btn_change_open(self):
@@ -77,6 +82,12 @@ class Controller:
 
     def to_judge(self):
         # 开始分析按钮
+        if self.judging == 0:
+            self.Judge.setText("停止分析")
+            self.judging = 1
+        else:
+            self.Judge.setText("开始分析")
+            self.judging = 0
         pass
 
     def change_img(self):
@@ -96,6 +107,13 @@ class Controller:
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     image = QPixmap.fromImage(QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format_RGB888))
                     self.Input.setPixmap(image)
+                    if self.judging == 1:
+                        is_flog = self.J._judge_flog(frame)
+                        if is_flog:
+                            print("有雾")
+                        else:
+                            print("没有")
+
 
 
 

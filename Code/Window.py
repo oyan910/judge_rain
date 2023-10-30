@@ -14,7 +14,7 @@ class Window(QWidget):
     def __init__(self):
         super().__init__()
         uic.loadUi('window.ui', self)
-        self.playing = False    # 播放状态
+        # self.playing = False    # 播放状态
         # self.Time = QTimer(self)
         # self.Time.timeout.connect(self.update_frame)
         # self.Time.start(1)
@@ -42,20 +42,20 @@ class Window(QWidget):
     #         self.Camera.setText("关闭摄像头")
     #         self.State.setText("<font color = 'red'>摄像头开启</font>")
     #     self.playing = not self.playing
-    def update_frame(self):
-        ret, frame = self.cap.read()
-        if self.playing:
-            if ret:
-                # 转换为RGB格式
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                height, width, channel = frame_rgb.shape
-                bytes_per_line = 3 * width
-
-                # 创建Qt图像
-                q_img = QImage(frame_rgb.data, width, height, bytes_per_line, QImage.Format_RGB888)
-                pixmap = QPixmap.fromImage(q_img)
-
-                # 显示视频帧
-                self.Input.setPixmap(pixmap)
+    # def update_frame(self):
+    #     ret, frame = self.cap.read()
+    #     if self.playing:
+    #         if ret:
+    #             # 转换为RGB格式
+    #             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    #             height, width, channel = frame_rgb.shape
+    #             bytes_per_line = 3 * width
+    #
+    #             # 创建Qt图像
+    #             q_img = QImage(frame_rgb.data, width, height, bytes_per_line, QImage.Format_RGB888)
+    #             pixmap = QPixmap.fromImage(q_img)
+    #
+    #             # 显示视频帧
+    #             self.Input.setPixmap(pixmap)
 
 
